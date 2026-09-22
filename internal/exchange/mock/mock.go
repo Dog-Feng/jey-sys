@@ -66,6 +66,12 @@ func (e *Exchange) GetAccount(ctx context.Context, symbol string) (domain.Accoun
 	return domain.AccountSnapshot{Position: e.pos, Allowed: allowed}, nil
 }
 
+func (e *Exchange) HasPendingBotOrders(ctx context.Context) bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.resting != nil
+}
+
 func (e *Exchange) CancelBotOrders(ctx context.Context, symbol string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()

@@ -10,6 +10,7 @@ import (
 type Exchange interface {
 	GetBook(ctx context.Context, symbol string) (domain.Book, error)
 	GetAccount(ctx context.Context, symbol string) (domain.AccountSnapshot, error)
+	HasPendingBotOrders(ctx context.Context) bool
 	CancelBotOrders(ctx context.Context, symbol string) error
 	PlaceLimitPostOnly(ctx context.Context, symbol string, tickID int64, intent domain.OrderIntent) (domain.OrderResult, error)
 }

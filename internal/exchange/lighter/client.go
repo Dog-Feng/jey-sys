@@ -19,6 +19,14 @@ import (
 	"github.com/jev-sys/bot/internal/position"
 )
 
+var lighterHTTP = &http.Client{
+	Timeout: 15 * time.Second,
+	Transport: &http.Transport{
+		MaxIdleConnsPerHost: 16,
+		IdleConnTimeout:     90 * time.Second,
+	},
+}
+
 // Client talks to RB Lighter REST + signed L2 txs.
 type Client struct {
 	cfg    config.Config
@@ -50,7 +58,7 @@ func New(cfg config.Config) (*Client, error) {
 	}
 	c := &Client{
 		cfg:    cfg,
-		http:   &http.Client{Timeout: 15 * time.Second},
+		http:   lighterHTTP,
 		signer: s,
 		coiSet: make(map[int64]struct{}),
 	}
@@ -183,6 +191,12 @@ func (c *Client) GetAccount(ctx context.Context, symbol string) (domain.AccountS
 	}
 	allowed := position.ComputeAllowed(pos, c.cfg.OrderSizeBTC, c.cfg.MaxPositionBTC)
 	return domain.AccountSnapshot{Position: pos, Allowed: allowed}, nil
+}
+
+func (c *Client) HasPendingBotOrders(ctx context.Context) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.coiSet) > 0
 }
 
 func (c *Client) CancelBotOrders(ctx context.Context, symbol string) error {

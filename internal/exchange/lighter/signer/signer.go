@@ -17,6 +17,14 @@ import (
 	"github.com/jev-sys/bot/internal/config"
 )
 
+var sendTxHTTP = &http.Client{
+	Timeout: 30 * time.Second,
+	Transport: &http.Transport{
+		MaxIdleConnsPerHost: 8,
+		IdleConnTimeout:     90 * time.Second,
+	},
+}
+
 // Signer signs L2 txs with lighter-go and submits them via REST sendTx.
 type Signer struct {
 	cfg    config.Config
@@ -56,7 +64,7 @@ func New(cfg config.Config) (*Signer, error) {
 	}
 	return &Signer{
 		cfg:  cfg,
-		http: &http.Client{Timeout: 30 * time.Second},
+		http: sendTxHTTP,
 		tx:   txClient,
 	}, nil
 }

@@ -188,7 +188,7 @@ go build -o bin\bot.exe .\cmd\bot
 | 6–7 | RB Lighter | 挂单：`nextNonce` + `POST /api/v1/sendTx` |
 | 8 | RB Lighter | `GET /api/v1/account`（更新仓位日志） |
 
-日志字段 **`ms`** 为上述步骤串行总耗时。JEV 超时可设 `JEV_TIMEOUT=2s` 或 `3s`；仍失败时检查到 `api.typesafe.ai` 的网络。
+日志字段 **`ms`** 为 tick 总耗时；**`ms_book`**（并行拉盘口+账户）、**`ms_jev`**、**`ms_exec`**（撤挂/读仓）便于定位瓶颈。`skip` 且无本地跟踪单时跳过撤单；`skip` 时不重复请求 account。JEV 超时可设 `JEV_TIMEOUT=2s` 或 `3s`。
 
 ---
 

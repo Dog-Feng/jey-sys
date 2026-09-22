@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/jev-sys/bot/internal/config"
 	"github.com/jev-sys/bot/internal/domain"
 	"github.com/jev-sys/bot/internal/exchange"
@@ -63,14 +65,24 @@ func (t *Trader) onTick(ctx context.Context) error {
 	t.tickID++
 	start := time.Now()
 
-	bk, err := t.ex.GetBook(ctx, t.cfg.Symbol)
-	if err != nil {
+	var bk domain.Book
+	var acct domain.AccountSnapshot
+	g, gctx := errgroup.WithContext(ctx)
+	g.Go(func() error {
+		var err error
+		bk, err = t.ex.GetBook(gctx, t.cfg.Symbol)
+		return err
+	})
+	g.Go(func() error {
+		var err error
+		acct, err = t.ex.GetAccount(gctx, t.cfg.Symbol)
+		return err
+	})
+	if err := g.Wait(); err != nil {
 		return err
 	}
-	acct, err := t.ex.GetAccount(ctx, t.cfg.Symbol)
-	if err != nil {
-		return err
-	}
+	afterBook := time.Now()
+
 	t.appendMid(bk.Mid)
 	state := t.buildState(bk, acct)
 
@@ -78,6 +90,7 @@ func (t *Trader) onTick(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	afterJev := time.Now()
 	if t.cfg.JevMinConfidence > 0 && dec.Confidence < t.cfg.JevMinConfidence {
 		if dec.Action == domain.ActionBuy && acct.Position.SizeBTC <= 0 {
 			dec.Action = domain.ActionHold
@@ -91,15 +104,23 @@ func (t *Trader) onTick(ctx context.Context) error {
 	}
 
 	intent := policy.Map(dec, acct.Position, acct.Allowed, bk, t.cfg)
-	if err := t.ex.CancelBotOrders(ctx, t.cfg.Symbol); err != nil {
-		return err
+	if !intent.Skip || t.ex.HasPendingBotOrders(ctx) {
+		if err := t.ex.CancelBotOrders(ctx, t.cfg.Symbol); err != nil {
+			return err
+		}
 	}
 	order, err := t.ex.PlaceLimitPostOnly(ctx, t.cfg.Symbol, t.tickID, intent)
 	if err != nil {
 		return err
 	}
+	afterExec := time.Now()
 
-	acct2, _ := t.ex.GetAccount(ctx, t.cfg.Symbol)
+	posSnap := acct
+	if !intent.Skip && order.Status == "placed" {
+		if fresh, err := t.ex.GetAccount(ctx, t.cfg.Symbol); err == nil {
+			posSnap = fresh
+		}
+	}
 	ev := domain.TickEvent{
 		TickID:    t.tickID,
 		TsMs:      time.Now().UnixMilli(),
@@ -111,7 +132,7 @@ func (t *Trader) onTick(ctx context.Context) error {
 		Decision:  &dec,
 		Intent:    intent,
 		Order:     order,
-		Position:  acct2.Position,
+		Position:  posSnap.Position,
 	}
 	t.lastEvent = &ev
 
@@ -123,8 +144,11 @@ func (t *Trader) onTick(ctx context.Context) error {
 		"reduce_only", intent.ReduceOnly,
 		"skip", intent.Skip,
 		"order", order.Status,
-		"pos", acct2.Position.SizeBTC,
+		"pos", posSnap.Position.SizeBTC,
 		"ms", time.Since(start).Milliseconds(),
+		"ms_book", afterBook.Sub(start).Milliseconds(),
+		"ms_jev", afterJev.Sub(afterBook).Milliseconds(),
+		"ms_exec", afterExec.Sub(afterJev).Milliseconds(),
 	)
 	return nil
 }
