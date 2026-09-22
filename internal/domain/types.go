@@ -96,6 +96,9 @@ type TradeState struct {
 	RecentMids    string
 	Position      Position
 	Allowed       Allowed
+	DualAccount   bool      `json:"dual_account,omitempty"`
+	PositionLegA  Position  `json:"position_leg_a,omitempty"`
+	PositionLegB  Position  `json:"position_leg_b,omitempty"`
 }
 
 type TickEvent struct {

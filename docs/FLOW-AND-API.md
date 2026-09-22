@@ -109,6 +109,18 @@ Orderly 错误 **-1103**：`Order price does not match the tick size.`
 
 ## 4. Lighter (RB)
 
+### 4.1 双账户 `LIGHTER_DUAL`
+
+| JEV | 执行账户 | 挂单 |
+|-----|----------|------|
+| buy | A（`LIGHTER_ACCOUNT_A_INDEX`） | long / bid |
+| sell | B（`LIGHTER_ACCOUNT_B_INDEX`） | short / ask |
+| hold | — | 撤 A+B，不挂新单 |
+
+订单簿仍用公开 API（与账户无关）。`policy.Map` 的仓位/allowed 按 **活跃腿** 取值（buy→A，sell→B）。
+
+## 4.2 Lighter API（单账户）
+
 | 用途 | 方法 | 路径 |
 |------|------|------|
 | 盘口 | `GET` | `/api/v1/orderBookOrders?market=...` |

@@ -73,6 +73,13 @@ func main() {
 	if cfg.Exchange == "lighter" && cfg.LighterLeverage > 0 {
 		startLog = append(startLog, "lighter_leverage", cfg.LighterLeverage, "lighter_leverage_cross", cfg.LighterLeverageCross)
 	}
+	if cfg.Exchange == "lighter" && cfg.LighterDual {
+		startLog = append(startLog,
+			"lighter_dual", true,
+			"lighter_account_a", cfg.LighterLegA.AccountIndex,
+			"lighter_account_b", cfg.LighterLegB.AccountIndex,
+		)
+	}
 	if cfg.Model == "jev" && len(cfg.TypeSafeKeys) > 0 {
 		startLog = append(startLog,
 			"typesafe_keys", len(cfg.TypeSafeKeys),
