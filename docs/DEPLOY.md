@@ -91,7 +91,8 @@ TICK_INTERVAL=3s
 DRY_RUN=false
 LIGHTER_API_KEY_INDEX=<2-254>
 LIGHTER_API_PRIVATE_KEY=<API 私钥>
-LEVERAGE=2
+LIGHTER_LEVERAGE=5
+LIGHTER_LEVERAGE_CROSS=true
 ORDER_SIZE_BTC=0.001
 MAX_POSITION_BTC=0.003
 ```
@@ -201,6 +202,7 @@ go build -o bin\bot.exe .\cmd\bot
 | `jev ... context deadline exceeded` | 增大 `JEV_TIMEOUT`、`TICK_INTERVAL` |
 | `order:"sim"` | `DRY_RUN=true`，正常 |
 | `order:"placed"` | Live post-only 已 broadcast |
+| 杠杆 | `LIGHTER_LEVERAGE`（或 `LEVERAGE`）1–100；`0` 跳过启动改杠杆；`LIGHTER_LEVERAGE_CROSS` 全仓/逐仓 |
 | TypeSafe 401 | 使用 [console.typesafe.ai](https://console.typesafe.ai/keys) 的 Key，不要用 `vck_` Gateway Key |
 
 ---

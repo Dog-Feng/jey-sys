@@ -47,9 +47,12 @@ $env:LIGHTER_CHAIN_ID="466324"
 $env:LIGHTER_ACCOUNT_INDEX="你的账户索引"
 $env:LIGHTER_API_KEY_INDEX="0"
 $env:LIGHTER_API_PRIVATE_KEY="你的API私钥"
-$env:LEVERAGE="2"
+$env:LIGHTER_LEVERAGE="5"
+$env:LIGHTER_LEVERAGE_CROSS="true"
 go run ./cmd/bot
 ```
+
+杠杆 **`LIGHTER_LEVERAGE`**（1–100，**0** 表示启动时不发改杠杆 tx；兼容旧名 **`LEVERAGE`**）。**`LIGHTER_LEVERAGE_CROSS`**：`true` 全仓 / `false` 逐仓。仅在 **`DRY_RUN=false`** 且 Lighter Live 时于启动执行一次。
 
 ## 测试
 

@@ -62,14 +62,18 @@ func main() {
 		}
 	}()
 
-	logger.Info("bot start",
+	startLog := []any{
 		"exchange", cfg.Exchange,
 		"dry_run", cfg.DryRun,
 		"model", cfg.Model,
 		"symbol", cfg.Symbol,
 		"tick", cfg.TickInterval.String(),
 		"cwd", mustCWD(),
-	)
+	}
+	if cfg.Exchange == "lighter" && cfg.LighterLeverage > 0 {
+		startLog = append(startLog, "lighter_leverage", cfg.LighterLeverage, "lighter_leverage_cross", cfg.LighterLeverageCross)
+	}
+	logger.Info("bot start", startLog...)
 
 	if err := tr.Run(ctx); err != nil && err != context.Canceled {
 		logger.Error("run", "err", err)

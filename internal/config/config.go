@@ -26,8 +26,9 @@ type Config struct {
 	LighterChainID    uint32
 	AccountIndex      int64
 	APIKeyIndex       uint8
-	APIPrivateKey     string
-	LighterLeverage   int
+	APIPrivateKey       string
+	LighterLeverage     int  // 0 = do not send update-leverage tx at startup
+	LighterLeverageCross bool // cross vs isolated margin
 
 	Model            string // mock | jev
 	TypeSafeAPIKey   string
@@ -59,8 +60,9 @@ func Load() (Config, error) {
 		LighterChainID: uint32(envInt("LIGHTER_CHAIN_ID", 466324)),
 		AccountIndex:   int64(envInt("LIGHTER_ACCOUNT_INDEX", 0)),
 		APIKeyIndex:    uint8(envInt("LIGHTER_API_KEY_INDEX", 0)),
-		APIPrivateKey:  os.Getenv("LIGHTER_API_PRIVATE_KEY"),
-		LighterLeverage: envInt("LEVERAGE", 2),
+		APIPrivateKey:        os.Getenv("LIGHTER_API_PRIVATE_KEY"),
+		LighterLeverage:      loadLighterLeverage(),
+		LighterLeverageCross: envBool("LIGHTER_LEVERAGE_CROSS", true),
 
 		Model:           env("MODEL", "mock"),
 		TypeSafeAPIKey:  os.Getenv("TYPESAFE_API_KEY"),
@@ -99,7 +101,22 @@ func Load() (Config, error) {
 	if c.Model == "mock" && c.Exchange == "lighter" && !c.DryRun {
 		// allow mock model on live exchange for testing execution path only
 	}
+	if c.LighterLeverage < 0 || c.LighterLeverage > 100 {
+		return c, fmt.Errorf("LIGHTER_LEVERAGE / LEVERAGE must be 0 (skip) or 1–100, got %d", c.LighterLeverage)
+	}
 	return c, nil
+}
+
+// loadLighterLeverage reads LIGHTER_LEVERAGE, then legacy LEVERAGE. 0 skips startup leverage tx.
+func loadLighterLeverage() int {
+	if v := strings.TrimSpace(os.Getenv("LIGHTER_LEVERAGE")); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return 0
+		}
+		return n
+	}
+	return envInt("LEVERAGE", 0)
 }
 
 func env(k, def string) string {

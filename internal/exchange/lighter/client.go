@@ -66,7 +66,7 @@ func New(cfg config.Config) (*Client, error) {
 		return nil, err
 	}
 	if s != nil && !cfg.DryRun && cfg.LighterLeverage > 0 {
-		if err := s.UpdateLeverage(context.Background(), c.marketIndex, cfg.LighterLeverage, true); err != nil {
+		if err := s.UpdateLeverage(context.Background(), c.marketIndex, cfg.LighterLeverage, cfg.LighterLeverageCross); err != nil {
 			return nil, fmt.Errorf("update leverage: %w", err)
 		}
 	}
