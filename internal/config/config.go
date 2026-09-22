@@ -19,8 +19,14 @@ type Config struct {
 	MinSpreadBps     float64
 	JevMinConfidence float64
 
-	Exchange string // mock | lighter
+	Exchange string // mock | lighter | vanta
 	DryRun   bool
+
+	VantaBaseURL       string
+	VantaSymbol        string
+	VantaAccountID     string
+	VantaOrderlyKey    string
+	VantaOrderlySecret string
 
 	LighterHost       string
 	LighterChainID    uint32
@@ -31,7 +37,9 @@ type Config struct {
 	LighterLeverageCross bool // cross vs isolated margin
 
 	Model            string // mock | jev
-	TypeSafeAPIKey   string
+	TypeSafeAPIKey     string // active key (TypeSafeKeys[TypeSafeKeyIndex])
+	TypeSafeKeys       []string
+	TypeSafeKeyIndex   int
 	JevModelID       string
 	JevTimeout       time.Duration
 	TypeSafeBaseURL  string
@@ -56,6 +64,12 @@ func Load() (Config, error) {
 		Exchange: env("EXCHANGE", "mock"),
 		DryRun:   envBool("DRY_RUN", true),
 
+		VantaBaseURL:       env("VANTA_BASE_URL", "https://api.orderly.org"),
+		VantaSymbol:        env("VANTA_SYMBOL", ""),
+		VantaAccountID:     os.Getenv("VANTA_ORDERLY_ACCOUNT_ID"),
+		VantaOrderlyKey:    os.Getenv("VANTA_ORDERLY_KEY"),
+		VantaOrderlySecret: os.Getenv("VANTA_ORDERLY_SECRET"),
+
 		LighterHost:    env("LIGHTER_HOST", "https://api.rh.lighter.xyz"),
 		LighterChainID: uint32(envInt("LIGHTER_CHAIN_ID", 466324)),
 		AccountIndex:   int64(envInt("LIGHTER_ACCOUNT_INDEX", 0)),
@@ -64,8 +78,7 @@ func Load() (Config, error) {
 		LighterLeverage:      loadLighterLeverage(),
 		LighterLeverageCross: envBool("LIGHTER_LEVERAGE_CROSS", true),
 
-		Model:           env("MODEL", "mock"),
-		TypeSafeAPIKey:  os.Getenv("TYPESAFE_API_KEY"),
+		Model: env("MODEL", "mock"),
 		JevModelID:      env("JEV_MODEL_ID", "jev-1.13.0"),
 		JevTimeout:      envDuration("JEV_TIMEOUT", 800*time.Millisecond),
 		TypeSafeBaseURL: env("TYPESAFE_BASE_URL", "https://api.typesafe.ai"),
@@ -89,14 +102,27 @@ func Load() (Config, error) {
 			return c, errors.New("LIGHTER_API_PRIVATE_KEY required when DRY_RUN=false")
 		}
 	}
-	c.TypeSafeAPIKey = strings.TrimSpace(c.TypeSafeAPIKey)
-	if c.Model == "jev" && c.TypeSafeAPIKey == "" {
-		return c, errors.New("TYPESAFE_API_KEY required when MODEL=jev")
-	}
-	if c.Model == "jev" && c.TypeSafeAPIKey != "" {
-		if err := validateTypeSafeKey(c.TypeSafeAPIKey); err != nil {
-			return c, err
+	if c.Exchange == "vanta" && !c.DryRun {
+		if c.VantaAccountID == "" || c.VantaOrderlySecret == "" {
+			return c, errors.New("VANTA_ORDERLY_ACCOUNT_ID and VANTA_ORDERLY_SECRET required when EXCHANGE=vanta and DRY_RUN=false")
 		}
+	}
+	c.TypeSafeKeys, c.TypeSafeKeyIndex = loadTypeSafeKeys(c.Exchange)
+	if c.Model == "jev" && len(c.TypeSafeKeys) == 0 {
+		return c, errors.New("TYPESAFE_API_KEYS or TYPESAFE_API_KEY required when MODEL=jev")
+	}
+	for i, k := range c.TypeSafeKeys {
+		k = strings.TrimSpace(k)
+		c.TypeSafeKeys[i] = k
+		if err := validateTypeSafeKey(k); err != nil {
+			return c, fmt.Errorf("typesafe key #%d: %w", i+1, err)
+		}
+	}
+	if len(c.TypeSafeKeys) > 0 {
+		if c.TypeSafeKeyIndex < 0 || c.TypeSafeKeyIndex >= len(c.TypeSafeKeys) {
+			c.TypeSafeKeyIndex = 0
+		}
+		c.TypeSafeAPIKey = c.TypeSafeKeys[c.TypeSafeKeyIndex]
 	}
 	if c.Model == "mock" && c.Exchange == "lighter" && !c.DryRun {
 		// allow mock model on live exchange for testing execution path only

@@ -13,7 +13,7 @@ func QuotePriceLong(b domain.Book, insideTicks int) float64 {
 	if p >= b.BestAsk {
 		p = b.BestBid
 	}
-	return roundToTick(p, tick)
+	return SnapToTick(p, tick)
 }
 
 // QuotePriceShort returns a non-crossing ask-side price (inside touch).
@@ -27,14 +27,7 @@ func QuotePriceShort(b domain.Book, insideTicks int) float64 {
 	if p <= b.BestBid {
 		p = b.BestAsk
 	}
-	return roundToTick(p, tick)
-}
-
-func roundToTick(p, tick float64) float64 {
-	if tick <= 0 {
-		return p
-	}
-	return float64(int64(p/tick+1e-9)) * tick
+	return SnapToTick(p, tick)
 }
 
 func SpreadBps(bid, ask, mid float64) float64 {

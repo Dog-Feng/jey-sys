@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -16,21 +17,23 @@ import (
 type JevModel struct {
 	cfg    config.Config
 	client *http.Client
+	keys   *KeyPool
 }
 
-func NewJev(cfg config.Config) *JevModel {
+func NewJev(cfg config.Config, log *slog.Logger) *JevModel {
 	return &JevModel{
 		cfg: cfg,
 		client: &http.Client{
 			Timeout: cfg.JevTimeout,
 		},
+		keys: NewKeyPool(cfg.TypeSafeKeys, cfg.TypeSafeKeyIndex, log),
 	}
 }
 
 type systemOneReq struct {
-	State     any               `json:"state"`
-	Model     string            `json:"model"`
-	Questions map[string]any    `json:"questions"`
+	State     any            `json:"state"`
+	Model     string         `json:"model"`
+	Questions map[string]any `json:"questions"`
 }
 
 type systemOneResp struct {
@@ -63,39 +66,61 @@ func (j *JevModel) Decide(ctx context.Context, state domain.TradeState) (domain.
 		return domain.Decision{}, err
 	}
 	url := j.cfg.TypeSafeBaseURL + "/v1/systemone"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(raw))
-	if err != nil {
-		return domain.Decision{}, err
-	}
-	req.Header.Set("Authorization", "Bearer "+j.cfg.TypeSafeAPIKey)
-	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := j.client.Do(req)
-	if err != nil {
-		return domain.Decision{}, err
+	attempts := j.keys.Len()
+	if attempts < 1 {
+		attempts = 1
 	}
-	defer resp.Body.Close()
-	b, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		return domain.Decision{}, fmt.Errorf("jev http %d: %s", resp.StatusCode, string(b))
+	var lastErr error
+	for try := 0; try < attempts; try++ {
+		key := j.keys.Current()
+		if key == "" {
+			return domain.Decision{}, fmt.Errorf("no typesafe api key configured")
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(raw))
+		if err != nil {
+			return domain.Decision{}, err
+		}
+		req.Header.Set("Authorization", "Bearer "+key)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := j.client.Do(req)
+		if err != nil {
+			lastErr = err
+			break
+		}
+		b, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			lastErr = fmt.Errorf("jev http %d: %s", resp.StatusCode, string(b))
+			if isTypeSafeQuotaError(resp.StatusCode, string(b)) && j.keys.Rotate(lastErr.Error()) {
+				continue
+			}
+			return domain.Decision{}, lastErr
+		}
+		var out systemOneResp
+		if err := json.Unmarshal(b, &out); err != nil {
+			return domain.Decision{}, err
+		}
+		dir := out.Answers["direction"]
+		action := domain.ActionBuy
+		if dir.Choice == "sell" {
+			action = domain.ActionSell
+		}
+		probs := map[domain.Action]float64{
+			domain.ActionBuy:  dir.Probabilities["buy"],
+			domain.ActionSell: dir.Probabilities["sell"],
+		}
+		return domain.Decision{
+			Action:        action,
+			Probabilities: probs,
+			Confidence:    dir.Confidence,
+			LatencyMs:     time.Since(start).Milliseconds(),
+		}, nil
 	}
-	var out systemOneResp
-	if err := json.Unmarshal(b, &out); err != nil {
-		return domain.Decision{}, err
+	if lastErr != nil {
+		return domain.Decision{}, lastErr
 	}
-	dir := out.Answers["direction"]
-	action := domain.ActionBuy
-	if dir.Choice == "sell" {
-		action = domain.ActionSell
-	}
-	probs := map[domain.Action]float64{
-		domain.ActionBuy:  dir.Probabilities["buy"],
-		domain.ActionSell: dir.Probabilities["sell"],
-	}
-	return domain.Decision{
-		Action:        action,
-		Probabilities: probs,
-		Confidence:    dir.Confidence,
-		LatencyMs:     time.Since(start).Milliseconds(),
-	}, nil
+	return domain.Decision{}, fmt.Errorf("jev: all typesafe keys exhausted")
 }

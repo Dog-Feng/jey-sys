@@ -36,7 +36,7 @@ func main() {
 	case "mock":
 		m = model.NewMock()
 	case "jev":
-		m = model.NewJev(cfg)
+		m = model.NewJev(cfg, logger)
 	default:
 		logger.Error("unknown MODEL", "model", cfg.Model)
 		os.Exit(1)
@@ -72,6 +72,15 @@ func main() {
 	}
 	if cfg.Exchange == "lighter" && cfg.LighterLeverage > 0 {
 		startLog = append(startLog, "lighter_leverage", cfg.LighterLeverage, "lighter_leverage_cross", cfg.LighterLeverageCross)
+	}
+	if cfg.Model == "jev" && len(cfg.TypeSafeKeys) > 0 {
+		startLog = append(startLog,
+			"typesafe_keys", len(cfg.TypeSafeKeys),
+			"typesafe_key_slot", cfg.TypeSafeKeyIndex+1,
+		)
+	}
+	if cfg.Exchange == "vanta" {
+		startLog = append(startLog, "vanta_symbol", cfg.VantaSymbol)
 	}
 	logger.Info("bot start", startLog...)
 

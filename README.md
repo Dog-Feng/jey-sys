@@ -33,6 +33,29 @@ curl http://127.0.0.1:8080/snapshot
 - **`vck_` 开头的是 Vercel AI Gateway Key**，不能用于 `api.typesafe.ai`（会返回 401）
 - 自检：`curl -s -o NUL -w "%{http_code}" https://api.typesafe.ai/v1/models -H "Authorization: Bearer 你的Key"` → 期望 **200**
 
+## Vanta（Orderly）
+
+基于 [Vanta API 文档](https://vanta-6.gitbook.io/vanta-gitbook/core-concepts/api)（底层 [Orderly REST](https://orderly.network/docs/build-on-omnichain/introduction)）。
+
+```env
+EXCHANGE=vanta
+DRY_RUN=true
+VANTA_BASE_URL=https://api.orderly.org
+SYMBOL=BTC
+# 默认 VANTA_SYMBOL=PERP_BTC_USDC
+```
+
+Live：`VANTA_ORDERLY_ACCOUNT_ID`、`VANTA_ORDERLY_SECRET`（及可选 `VANTA_ORDERLY_KEY`）。
+
+## TypeSafe 多 Key
+
+```env
+TYPESAFE_API_KEYS=key_lighter,key_vanta,key_spare
+```
+
+- **lighter / mock** 默认用列表 **第 1 个** Key，**vanta** 默认用 **第 2 个**（`TYPESAFE_KEY_INDEX` 可覆盖，从 0 起）。
+- JEV 返回 **402/429** 或 body 含额度不足等文案时 **自动轮换** 下一个 Key（日志 `typesafe key rotate`）。
+
 ## Lighter Live
 
 1. `EXCHANGE=lighter`，填 `LIGHTER_*` 与账户索引。

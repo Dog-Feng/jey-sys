@@ -144,6 +144,7 @@ func (t *Trader) onTick(ctx context.Context) error {
 		"reduce_only", intent.ReduceOnly,
 		"skip", intent.Skip,
 		"order", order.Status,
+		"order_err", order.Error,
 		"pos", posSnap.Position.SizeBTC,
 		"ms", time.Since(start).Milliseconds(),
 		"ms_book", afterBook.Sub(start).Milliseconds(),

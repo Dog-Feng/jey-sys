@@ -2,7 +2,7 @@
 
 JEV × [RB Lighter](https://apidocs.rh.lighter.xyz/docs/get-started) BTC 永续 Style A 做市 Bot（Go 单进程）。本文覆盖 **Linux 生产部署**、Windows 本地运行要点、配置分阶段与运维检查。
 
-> 产品设计见 [PRD-jev-lighter-btc-mm.md](./PRD-jev-lighter-btc-mm.md)。仓库示例配置：`configs/example.env`（复制为 `configs/.env` 后填写，**不要提交 Git**）。
+> 产品设计见 [PRD-jev-lighter-btc-mm.md](./PRD-jev-lighter-btc-mm.md)。端到端流程与 Lighter/Vanta API 见 [FLOW-AND-API.md](./FLOW-AND-API.md)。仓库示例配置：`configs/example.env`（复制为 `configs/.env` 后填写，**不要提交 Git**）。
 
 ---
 
@@ -69,7 +69,19 @@ HTTP_LISTEN=127.0.0.1:8080
 DATA_DIR=/opt/jev-sys/data
 ```
 
-**阶段 B — RB 真实盘口 + 模拟下单（不发链上 tx）**
+**阶段 B2 — Vanta（Orderly）干跑**
+
+```env
+EXCHANGE=vanta
+DRY_RUN=true
+VANTA_BASE_URL=https://api.orderly.org
+SYMBOL=BTC
+TYPESAFE_API_KEYS=key_a,key_b
+```
+
+Vanta 说明见 [Vanta API](https://vanta-6.gitbook.io/vanta-gitbook/core-concepts/api)。JEV 默认使用 `TYPESAFE_API_KEYS` 中 **第 2 个** Key（index 1）；Lighter 用 **第 1 个**。额度不足时自动轮换下一个 Key。
+
+**阶段 B1 — Lighter RB 真实盘口 + 模拟下单（不发链上 tx）**
 
 ```env
 EXCHANGE=lighter
