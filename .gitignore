@@ -1,0 +1,21 @@
+# 密钥与本地配置（勿提交）
+configs/.env
+.env
+*.pem
+*.key
+
+# 构建产物（勿写裸名 bot，否则会忽略 cmd/bot/）
+/bin/
+/bot
+/bot.exe
+
+# 运行数据与日志
+/data/
+*.log
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
