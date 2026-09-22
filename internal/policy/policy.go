@@ -7,18 +7,16 @@ import (
 )
 
 // Map turns JEV buy/sell into a single post-only order intent (Style A).
-// Inverted quote mapping: JEV buy → short (ask) side, JEV sell → long (bid) side.
+// Aligned mapping: JEV buy → long (bid) side, JEV sell → short (ask) side.
 func Map(dec domain.Decision, pos domain.Position, allowed domain.Allowed, bk domain.Book, cfg config.Config) domain.OrderIntent {
 	if dec.Action == domain.ActionHold || dec.Late {
 		return domain.OrderIntent{Skip: true, SkipReason: "hold_or_late"}
 	}
 	size := cfg.OrderSizeBTC
-	// Contrarian / fade: bullish JEV → hang ask; bearish JEV → hang bid.
-	quoteShort := dec.Action == domain.ActionBuy
-	if quoteShort {
-		return mapShortSide(pos, allowed, bk, cfg, size)
+	if dec.Action == domain.ActionBuy {
+		return mapLongSide(pos, allowed, bk, cfg, size)
 	}
-	return mapLongSide(pos, allowed, bk, cfg, size)
+	return mapShortSide(pos, allowed, bk, cfg, size)
 }
 
 func mapLongSide(pos domain.Position, allowed domain.Allowed, bk domain.Book, cfg config.Config, size float64) domain.OrderIntent {

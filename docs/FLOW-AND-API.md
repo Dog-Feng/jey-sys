@@ -23,7 +23,7 @@ sequenceDiagram
   T->>JEV: POST /v1/systemone (state)
   JEV-->>T: buy | sell | hold
   T->>POL: Decision + Book + 配置
-  Note over POL: buy→挂 ask(short)<br/>sell→挂 bid(long)
+  Note over POL: buy→挂 bid(long)<br/>sell→挂 ask(short)
   POL-->>T: OrderIntent(Price, Side, Size)
   alt 有 pending 或需挂单
     T->>EX: CancelBotOrders
@@ -37,7 +37,7 @@ sequenceDiagram
 | 定时 | `internal/trader/trader.go` `Run` | `TICK_INTERVAL`，默认 2s；`TryLock` 防重入 |
 | 盘口/账户 | `GetBook` / `GetAccount` | `errgroup` 并行 |
 | 决策 | `internal/model` | `TYPESAFE_BASE_URL` + Key 池；402/429 轮换 key |
-| 映射 | `internal/policy/policy.go` | **反向**：JEV `buy`→做空侧 ask，`sell`→做多侧 bid；反向仓 `reduce_only` |
+| 映射 | `internal/policy/policy.go` | **同向**：JEV `buy`→做多侧 bid，`sell`→做空侧 ask；持反向仓时 `reduce_only` |
 | 报价 | `internal/book/quote.go` | `BestBid/Ask ± insideTicks×TickSize`，不穿越对手价 |
 | 执行 | `CancelBotOrders` → `PlaceLimitPostOnly` | Style A：最多 1 张 bot 单 |
 

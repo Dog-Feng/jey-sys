@@ -63,15 +63,15 @@
 
 1. **每个 tick**（可配置间隔，默认 1–3s）：读订单簿 + 账户仓位 → JEV 决策 → **取消本市场当前 bot 管理的挂单** → 挂 **1 张** post-only 限价单。
 2. **单周期最多 1 张新单**（与 jev-trader 一致）；不叠多张同向挂单。
-3. **JEV 输出** `buy` | `sell` 经 **反向挂单映射** 转为挂单侧（见 3.2），不是强制 taker 开仓。
+3. **JEV 输出** `buy` | `sell` 经 **同向挂单映射** 转为挂单侧（见 3.2），不是强制 taker 开仓。
 4. **成交改变净仓位**；下一 tick 根据最新 `position` 与 `allowed` 再决策。
-5. **减仓与平仓** 通过 **反向 post-only + `reduce_only`** 实现（当 JEV 方向与减仓方向一致时）；禁止 reduce 单误开反向新仓。
+5. **减仓与平仓** 通过 **同向 post-only + `reduce_only`** 实现（JEV 与持仓反向时先减仓）；禁止 reduce 单误开反向新仓。
 
 ### 3.2 JEV 决策语义
 
 - **问题类型**：`choice` — 「未来 H 个 tick（或等价 ~30s）相对当前 mid，更偏向上涨还是下跌？」
-- **映射（反向）**：`buy` → 挂 **short / ask 侧** post-only（best ask − inside ticks）
-- **映射（反向）**：`sell` → 挂 **long / bid 侧** post-only（best bid + inside ticks）
+- **映射（同向）**：`buy` → 挂 **long / bid 侧** post-only（best bid + inside ticks）
+- **映射（同向）**：`sell` → 挂 **short / ask 侧** post-only（best ask − inside ticks）
 - **迟到 tick**：若上一 tick 仍在执行（JEV + 下单 RTT 超 `TICK_INTERVAL`），标记 `late`，本 tick **不挂单**（对齐 jev-trader `hold` 行为，可选配置「late 仍挂 reduce_only」为 v1）。
 
 ### 3.3 仓位与 allowed（硬规则优先于 JEV）
@@ -83,8 +83,11 @@
 | buy | flat | post-only **long**，开多意图 |
 | buy | short | post-only **long**，**reduce_only**，size = min(ORDER_SIZE, \|pos\|) |
 | buy | long 且 \|pos\| < MAX | post-only long，加仓 |
-| buy | long 且 \|pos\| ≥ MAX | **不挂 long**；若允许则挂 reduce short 或 skip（`capped=true`） |
-| sell | 对称 | post-only short / reduce_only long / capped |
+| buy | long 且 \|pos\| ≥ MAX | skip（`capped=true`，`max_long`） |
+| sell | flat | post-only **short**，开空意图 |
+| sell | long | post-only **short**，**reduce_only**，size = min(ORDER_SIZE, \|pos\|) |
+| sell | short 且 \|pos\| < MAX | post-only short，加仓 |
+| sell | short 且 \|pos\| ≥ MAX | skip（`capped=true`，`max_short`） |
 
 **保证金不足**：对应方向 `allowed=false`，跳过该方向；若双向都不允许 → 本 tick skip 并告警。
 
@@ -464,7 +467,7 @@ func Map(dec Decision, pos Position, book Book, cfg Config) Intent {
         }
         return Intent{Side: Long, Price: QuotePriceLong(book, cfg), Size: size}
     }
-    // sell 对称 → short / reduce long
+    // sell → short / reduce long via short quote
 }
 ```
 
