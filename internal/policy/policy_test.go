@@ -7,10 +7,30 @@ import (
 	"github.com/jev-sys/bot/internal/domain"
 )
 
-func TestMapReduceShort(t *testing.T) {
+func TestMapJevSellQuotesLongFlat(t *testing.T) {
+	cfg := config.Config{OrderSizeBTC: 0.001, MaxPositionBTC: 0.003, QuoteInsideTicks: 1}
+	bk := domain.Book{BestBid: 100, BestAsk: 101, Mid: 100.5, TickSize: 0.5}
+	dec := domain.Decision{Action: domain.ActionSell}
+	intent := Map(dec, domain.Position{}, domain.Allowed{IncreaseLong: true}, bk, cfg)
+	if intent.Skip || intent.Side != domain.SideLong || intent.ReduceOnly {
+		t.Fatalf("expected open long quote, got %+v", intent)
+	}
+}
+
+func TestMapJevBuyQuotesShortFlat(t *testing.T) {
 	cfg := config.Config{OrderSizeBTC: 0.001, MaxPositionBTC: 0.003, QuoteInsideTicks: 1}
 	bk := domain.Book{BestBid: 100, BestAsk: 101, Mid: 100.5, TickSize: 0.5}
 	dec := domain.Decision{Action: domain.ActionBuy}
+	intent := Map(dec, domain.Position{}, domain.Allowed{IncreaseShort: true}, bk, cfg)
+	if intent.Skip || intent.Side != domain.SideShort || intent.ReduceOnly {
+		t.Fatalf("expected open short quote, got %+v", intent)
+	}
+}
+
+func TestMapReduceShort(t *testing.T) {
+	cfg := config.Config{OrderSizeBTC: 0.001, MaxPositionBTC: 0.003, QuoteInsideTicks: 1}
+	bk := domain.Book{BestBid: 100, BestAsk: 101, Mid: 100.5, TickSize: 0.5}
+	dec := domain.Decision{Action: domain.ActionSell}
 	pos := domain.Position{SizeBTC: -0.002}
 	allowed := domain.Allowed{IncreaseLong: true, ReduceShort: true}
 
@@ -26,7 +46,7 @@ func TestMapReduceShort(t *testing.T) {
 func TestMapMaxLongSkip(t *testing.T) {
 	cfg := config.Config{OrderSizeBTC: 0.001, MaxPositionBTC: 0.003, QuoteInsideTicks: 1}
 	bk := domain.Book{BestBid: 100, BestAsk: 101, TickSize: 0.5}
-	dec := domain.Decision{Action: domain.ActionBuy}
+	dec := domain.Decision{Action: domain.ActionSell}
 	pos := domain.Position{SizeBTC: 0.003}
 	intent := Map(dec, pos, domain.Allowed{}, bk, cfg)
 	if !intent.Skip || !intent.Capped {

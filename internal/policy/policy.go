@@ -6,35 +6,42 @@ import (
 	"github.com/jev-sys/bot/internal/domain"
 )
 
-// Map turns a JEV buy/sell into a single post-only order intent (Style A).
+// Map turns JEV buy/sell into a single post-only order intent (Style A).
+// Inverted quote mapping: JEV buy → short (ask) side, JEV sell → long (bid) side.
 func Map(dec domain.Decision, pos domain.Position, allowed domain.Allowed, bk domain.Book, cfg config.Config) domain.OrderIntent {
 	if dec.Action == domain.ActionHold || dec.Late {
 		return domain.OrderIntent{Skip: true, SkipReason: "hold_or_late"}
 	}
-	wantBuy := dec.Action == domain.ActionBuy
 	size := cfg.OrderSizeBTC
+	// Contrarian / fade: bullish JEV → hang ask; bearish JEV → hang bid.
+	quoteShort := dec.Action == domain.ActionBuy
+	if quoteShort {
+		return mapShortSide(pos, allowed, bk, cfg, size)
+	}
+	return mapLongSide(pos, allowed, bk, cfg, size)
+}
 
-	if wantBuy {
-		if pos.SizeBTC < -1e-12 {
-			sz := min(size, pos.Abs())
-			return domain.OrderIntent{
-				Side: domain.SideLong, ReduceOnly: true,
-				Price: book.QuotePriceLong(bk, cfg.QuoteInsideTicks), SizeBTC: sz,
-			}
-		}
-		if pos.SizeBTC >= cfg.MaxPositionBTC-1e-12 {
-			return domain.OrderIntent{Skip: true, Capped: true, SkipReason: "max_long"}
-		}
-		if !allowed.IncreaseLong {
-			return domain.OrderIntent{Skip: true, SkipReason: "not_allowed_long"}
-		}
+func mapLongSide(pos domain.Position, allowed domain.Allowed, bk domain.Book, cfg config.Config, size float64) domain.OrderIntent {
+	if pos.SizeBTC < -1e-12 {
+		sz := min(size, pos.Abs())
 		return domain.OrderIntent{
-			Side: domain.SideLong, ReduceOnly: false,
-			Price: book.QuotePriceLong(bk, cfg.QuoteInsideTicks), SizeBTC: size,
+			Side: domain.SideLong, ReduceOnly: true,
+			Price: book.QuotePriceLong(bk, cfg.QuoteInsideTicks), SizeBTC: sz,
 		}
 	}
+	if pos.SizeBTC >= cfg.MaxPositionBTC-1e-12 {
+		return domain.OrderIntent{Skip: true, Capped: true, SkipReason: "max_long"}
+	}
+	if !allowed.IncreaseLong {
+		return domain.OrderIntent{Skip: true, SkipReason: "not_allowed_long"}
+	}
+	return domain.OrderIntent{
+		Side: domain.SideLong, ReduceOnly: false,
+		Price: book.QuotePriceLong(bk, cfg.QuoteInsideTicks), SizeBTC: size,
+	}
+}
 
-	// sell → short side
+func mapShortSide(pos domain.Position, allowed domain.Allowed, bk domain.Book, cfg config.Config, size float64) domain.OrderIntent {
 	if pos.SizeBTC > 1e-12 {
 		sz := min(size, pos.Abs())
 		return domain.OrderIntent{
