@@ -119,12 +119,6 @@ Orderly 错误 **-1103**：`Order price does not match the tick size.`
 
 订单簿仍用公开 API（与账户无关）。`policy.Map` 的仓位/allowed 按 **活跃腿** 取值（buy→A，sell→B）。
 
-**双满 UNWIND**（`LIGHTER_DUAL_UNWIND=true`）：
-
-1. **进入**：连续 `UNWIND_ENTER_CONFIRM_TICKS` 个 tick 满足 `pos_A ≥ MAX` 且 `pos_B ≤ -MAX` → `phase=unwind`，日志 `unwind_start`。
-2. **UNWIND tick**：仍调 JEV（仅观测）；执行 `policy.MapDualUnwind` — A **short reduce-only** 减多、B **long reduce-only** 减空；每 tick 最多 **2 张** post-only；撤 A+B 旧单。
-3. **退出**：连续 `UNWIND_EXIT_CONFIRM_TICKS` 个 tick 双仓 `|pos| ≤ UNWIND_FLAT_EPS` → `phase=normal`，日志 `unwind_complete`，恢复 JEV 正循环。
-
 ## 4.2 Lighter API（单账户）
 
 | 用途 | 方法 | 路径 |

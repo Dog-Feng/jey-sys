@@ -99,7 +99,6 @@ type TradeState struct {
 	DualAccount   bool      `json:"dual_account,omitempty"`
 	PositionLegA  Position  `json:"position_leg_a,omitempty"`
 	PositionLegB  Position  `json:"position_leg_b,omitempty"`
-	Phase         string    `json:"phase,omitempty"`
 }
 
 type TickEvent struct {
@@ -115,5 +114,4 @@ type TickEvent struct {
 	Order     OrderResult
 	Position  Position
 	Late      bool
-	Phase     string `json:"phase,omitempty"`
 }

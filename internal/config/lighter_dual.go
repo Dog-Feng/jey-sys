@@ -51,25 +51,7 @@ func loadLighterDual(c *Config) error {
 			return errors.New("LIGHTER_DUAL live requires LIGHTER_A_API_PRIVATE_KEY and LIGHTER_B_API_PRIVATE_KEY (A may fall back to LIGHTER_API_PRIVATE_KEY)")
 		}
 	}
-	loadDualUnwind(c)
 	return nil
-}
-
-func loadDualUnwind(c *Config) {
-	if !c.LighterDual {
-		c.LighterDualUnwind = false
-		return
-	}
-	c.LighterDualUnwind = envBool("LIGHTER_DUAL_UNWIND", true)
-	c.UnwindEnterConfirmTicks = envInt("UNWIND_ENTER_CONFIRM_TICKS", 2)
-	c.UnwindExitConfirmTicks = envInt("UNWIND_EXIT_CONFIRM_TICKS", 2)
-	c.UnwindFlatEps = envFloat("UNWIND_FLAT_EPS", 1e-6)
-	if c.UnwindEnterConfirmTicks < 1 {
-		c.UnwindEnterConfirmTicks = 1
-	}
-	if c.UnwindExitConfirmTicks < 1 {
-		c.UnwindExitConfirmTicks = 1
-	}
 }
 
 func (c Config) WithLighterLeg(leg LighterLeg) Config {

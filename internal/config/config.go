@@ -38,10 +38,6 @@ type Config struct {
 	LighterDual         bool
 	LighterLegA         LighterLeg // JEV buy → long quotes
 	LighterLegB         LighterLeg // JEV sell → short quotes
-	LighterDualUnwind   bool
-	UnwindEnterConfirmTicks int
-	UnwindExitConfirmTicks  int
-	UnwindFlatEps           float64
 
 	Model            string // mock | jev
 	TypeSafeAPIKey     string // active key (TypeSafeKeys[TypeSafeKeyIndex])
