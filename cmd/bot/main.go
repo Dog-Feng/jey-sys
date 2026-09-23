@@ -78,7 +78,14 @@ func main() {
 			"lighter_dual", true,
 			"lighter_account_a", cfg.LighterLegA.AccountIndex,
 			"lighter_account_b", cfg.LighterLegB.AccountIndex,
+			"lighter_dual_unwind", cfg.LighterDualUnwind,
 		)
+		if cfg.LighterDualUnwind {
+			startLog = append(startLog,
+				"unwind_enter_confirm_ticks", cfg.UnwindEnterConfirmTicks,
+				"unwind_exit_confirm_ticks", cfg.UnwindExitConfirmTicks,
+			)
+		}
 	}
 	if cfg.Model == "jev" && len(cfg.TypeSafeKeys) > 0 {
 		startLog = append(startLog,

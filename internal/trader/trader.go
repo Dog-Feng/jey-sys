@@ -28,10 +28,22 @@ type Trader struct {
 	tickID    int64
 	mids      []float64
 	lastEvent *domain.TickEvent
+
+	dualPhase      domain.DualPhase
+	dualCapStreak  int
+	dualFlatStreak int
+	unwindTicks    int64
 }
 
 func New(cfg config.Config, ex exchange.Exchange, m model.Model, st *store.JSONL, logger *slog.Logger) *Trader {
-	return &Trader{cfg: cfg, ex: ex, model: m, store: st, log: logger}
+	return &Trader{
+		cfg:       cfg,
+		ex:        ex,
+		model:     m,
+		store:     st,
+		log:       logger,
+		dualPhase: domain.DualPhaseNormal,
+	}
 }
 
 func (t *Trader) LastEvent() *domain.TickEvent {
@@ -117,6 +129,15 @@ func (t *Trader) onTick(ctx context.Context) error {
 		dec.Action = domain.ActionHold
 	}
 
+	if t.cfg.LighterDual && t.cfg.LighterDualUnwind {
+		if t.dualPhase == domain.DualPhaseNormal {
+			t.tryEnterUnwind(acctA.Position, acctB.Position)
+		}
+		if t.dualPhase == domain.DualPhaseUnwind {
+			return t.runUnwindTick(ctx, start, afterBook, afterJev, bk, acctA, acctB, dec)
+		}
+	}
+
 	acctPolicy := acctA
 	switch dec.Action {
 	case domain.ActionSell:
@@ -179,6 +200,7 @@ func (t *Trader) onTick(ctx context.Context) error {
 	}
 	if t.cfg.LighterDual {
 		logArgs = append(logArgs,
+			"phase", t.dualPhase,
 			"pos_a", acctA.Position.SizeBTC,
 			"pos_b", acctB.Position.SizeBTC,
 			"exec_leg", execLegLabel(dec.Action, intent.Skip),
@@ -288,6 +310,9 @@ func (t *Trader) buildState(bk domain.Book, acctA, acctB domain.AccountSnapshot)
 		st.DualAccount = true
 		st.PositionLegA = acctA.Position
 		st.PositionLegB = acctB.Position
+		if t.cfg.LighterDualUnwind {
+			st.Phase = string(t.dualPhase)
+		}
 	}
 	return st
 }
