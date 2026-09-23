@@ -14,9 +14,6 @@ func New(cfg config.Config) (Exchange, error) {
 	case "mock":
 		return mock.New(cfg), nil
 	case "lighter":
-		if cfg.LighterDual {
-			return lighter.NewDual(cfg)
-		}
 		return lighter.New(cfg)
 	case "vanta":
 		return vanta.New(cfg)

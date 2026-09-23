@@ -35,9 +35,6 @@ type Config struct {
 	APIPrivateKey       string
 	LighterLeverage     int  // 0 = do not send update-leverage tx at startup
 	LighterLeverageCross bool // cross vs isolated margin
-	LighterDual         bool
-	LighterLegA         LighterLeg // JEV buy → long quotes
-	LighterLegB         LighterLeg // JEV sell → short quotes
 
 	Model            string // mock | jev
 	TypeSafeAPIKey     string // active key (TypeSafeKeys[TypeSafeKeyIndex])
@@ -97,10 +94,7 @@ func Load() (Config, error) {
 	if c.MaxPositionBTC < c.OrderSizeBTC {
 		return c, fmt.Errorf("MAX_POSITION_BTC (%v) must be >= ORDER_SIZE_BTC (%v)", c.MaxPositionBTC, c.OrderSizeBTC)
 	}
-	if err := loadLighterDual(&c); err != nil {
-		return c, err
-	}
-	if c.Exchange == "lighter" && !c.DryRun && !c.LighterDual {
+	if c.Exchange == "lighter" && !c.DryRun {
 		if c.AccountIndex <= 0 {
 			return c, errors.New("LIGHTER_ACCOUNT_INDEX required when DRY_RUN=false")
 		}

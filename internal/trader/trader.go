@@ -66,8 +66,7 @@ func (t *Trader) onTick(ctx context.Context) error {
 	start := time.Now()
 
 	var bk domain.Book
-	var acctA domain.AccountSnapshot
-	var acctB domain.AccountSnapshot
+	var acct domain.AccountSnapshot
 	g, gctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
 		var err error
@@ -76,25 +75,16 @@ func (t *Trader) onTick(ctx context.Context) error {
 	})
 	g.Go(func() error {
 		var err error
-		acctA, err = t.ex.GetAccount(gctx, t.cfg.Symbol)
+		acct, err = t.ex.GetAccount(gctx, t.cfg.Symbol)
 		return err
 	})
-	if t.cfg.LighterDual {
-		g.Go(func() error {
-			var err error
-			acctB, err = t.lighterAccountB(gctx)
-			return err
-		})
-	} else {
-		acctB = acctA
-	}
 	if err := g.Wait(); err != nil {
 		return err
 	}
 	afterBook := time.Now()
 
 	t.appendMid(bk.Mid)
-	state := t.buildState(bk, acctA, acctB)
+	state := t.buildState(bk, acct)
 
 	dec, err := t.model.Decide(ctx, state)
 	if err != nil {
@@ -102,14 +92,10 @@ func (t *Trader) onTick(ctx context.Context) error {
 	}
 	afterJev := time.Now()
 	if t.cfg.JevMinConfidence > 0 && dec.Confidence < t.cfg.JevMinConfidence {
-		pos := acctA.Position.SizeBTC
-		if dec.Action == domain.ActionSell && t.cfg.LighterDual {
-			pos = acctB.Position.SizeBTC
-		}
-		if dec.Action == domain.ActionBuy && pos <= 0 {
+		if dec.Action == domain.ActionBuy && acct.Position.SizeBTC <= 0 {
 			dec.Action = domain.ActionHold
 		}
-		if dec.Action == domain.ActionSell && pos >= 0 {
+		if dec.Action == domain.ActionSell && acct.Position.SizeBTC >= 0 {
 			dec.Action = domain.ActionHold
 		}
 	}
@@ -117,14 +103,7 @@ func (t *Trader) onTick(ctx context.Context) error {
 		dec.Action = domain.ActionHold
 	}
 
-	acctPolicy := acctA
-	switch dec.Action {
-	case domain.ActionSell:
-		acctPolicy = acctB
-	case domain.ActionBuy:
-		acctPolicy = acctA
-	}
-	intent := policy.Map(dec, acctPolicy.Position, acctPolicy.Allowed, bk, t.cfg)
+	intent := policy.Map(dec, acct.Position, acct.Allowed, bk, t.cfg)
 	if !intent.Skip || t.ex.HasPendingBotOrders(ctx) {
 		if err := t.ex.CancelBotOrders(ctx, t.cfg.Symbol); err != nil {
 			return err
@@ -136,13 +115,9 @@ func (t *Trader) onTick(ctx context.Context) error {
 	}
 	afterExec := time.Now()
 
-	posSnap := acctPolicy
+	posSnap := acct
 	if !intent.Skip && order.Status == "placed" {
-		if dec.Action == domain.ActionSell && t.cfg.LighterDual {
-			if fresh, err := t.lighterAccountB(ctx); err == nil {
-				posSnap = fresh
-			}
-		} else if fresh, err := t.ex.GetAccount(ctx, t.cfg.Symbol); err == nil {
+		if fresh, err := t.ex.GetAccount(ctx, t.cfg.Symbol); err == nil {
 			posSnap = fresh
 		}
 	}
@@ -162,13 +137,12 @@ func (t *Trader) onTick(ctx context.Context) error {
 	t.lastEvent = &ev
 
 	_ = t.store.Append(ev)
-	logArgs := []any{
+	t.log.Info("tick",
 		"id", ev.TickID,
 		"action", dec.Action,
 		"intent_side", intent.Side,
 		"reduce_only", intent.ReduceOnly,
 		"skip", intent.Skip,
-		"skip_reason", intent.SkipReason,
 		"order", order.Status,
 		"order_err", order.Error,
 		"pos", posSnap.Position.SizeBTC,
@@ -176,41 +150,8 @@ func (t *Trader) onTick(ctx context.Context) error {
 		"ms_book", afterBook.Sub(start).Milliseconds(),
 		"ms_jev", afterJev.Sub(afterBook).Milliseconds(),
 		"ms_exec", afterExec.Sub(afterJev).Milliseconds(),
-	}
-	if t.cfg.LighterDual {
-		logArgs = append(logArgs,
-			"pos_a", acctA.Position.SizeBTC,
-			"pos_b", acctB.Position.SizeBTC,
-			"exec_leg", execLegLabel(dec.Action, intent.Skip),
-		)
-	}
-	t.log.Info("tick", logArgs...)
+	)
 	return nil
-}
-
-func execLegLabel(action domain.Action, skip bool) string {
-	if skip || action == domain.ActionHold {
-		return "none"
-	}
-	if action == domain.ActionBuy {
-		return "A_long"
-	}
-	if action == domain.ActionSell {
-		return "B_short"
-	}
-	return "none"
-}
-
-type lighterDualAccount interface {
-	GetAccountB(ctx context.Context, symbol string) (domain.AccountSnapshot, error)
-}
-
-func (t *Trader) lighterAccountB(ctx context.Context) (domain.AccountSnapshot, error) {
-	d, ok := t.ex.(lighterDualAccount)
-	if !ok {
-		return t.ex.GetAccount(ctx, t.cfg.Symbol)
-	}
-	return d.GetAccountB(ctx, t.cfg.Symbol)
 }
 
 func (t *Trader) emitLate() {
@@ -240,7 +181,7 @@ func (t *Trader) appendMid(mid float64) {
 	}
 }
 
-func (t *Trader) buildState(bk domain.Book, acctA, acctB domain.AccountSnapshot) domain.TradeState {
+func (t *Trader) buildState(bk domain.Book, acct domain.AccountSnapshot) domain.TradeState {
 	ret := func(k int) float64 {
 		n := len(t.mids)
 		if n <= k {
@@ -268,7 +209,7 @@ func (t *Trader) buildState(bk domain.Book, acctA, acctB domain.AccountSnapshot)
 	if len(t.mids) > 0 {
 		mid = t.mids[len(t.mids)-1]
 	}
-	st := domain.TradeState{
+	return domain.TradeState{
 		Symbol:       t.cfg.Symbol,
 		TickID:       t.tickID,
 		HorizonTicks: t.cfg.HorizonTicks,
@@ -281,13 +222,7 @@ func (t *Trader) buildState(bk domain.Book, acctA, acctB domain.AccountSnapshot)
 			"last20": ret(20),
 		},
 		RecentMids: recent,
-		Position:   acctA.Position,
-		Allowed:    acctA.Allowed,
+		Position:   acct.Position,
+		Allowed:    acct.Allowed,
 	}
-	if t.cfg.LighterDual {
-		st.DualAccount = true
-		st.PositionLegA = acctA.Position
-		st.PositionLegB = acctB.Position
-	}
-	return st
 }

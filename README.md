@@ -77,18 +77,6 @@ go run ./cmd/bot
 
 杠杆 **`LIGHTER_LEVERAGE`**（1–100，**0** 表示启动时不发改杠杆 tx；兼容旧名 **`LEVERAGE`**）。**`LIGHTER_LEVERAGE_CROSS`**：`true` 全仓 / `false` 逐仓。仅在 **`DRY_RUN=false`** 且 Lighter Live 时于启动执行一次。
 
-### Lighter 双账户（A 多 / B 空）
-
-`LIGHTER_DUAL=true` 时：**JEV buy** 只在 **账户 A** 挂多侧单；**JEV sell** 只在 **账户 B** 挂空侧单；每 tick 会 **撤 A、B 两侧** bot 挂单后再挂活跃腿（Style A）。JEV 状态里带 `position_leg_a` / `position_leg_b`。
-
-```env
-LIGHTER_DUAL=true
-LIGHTER_ACCOUNT_A_INDEX=123
-LIGHTER_ACCOUNT_B_INDEX=456
-LIGHTER_A_API_PRIVATE_KEY=...
-LIGHTER_B_API_PRIVATE_KEY=...
-```
-
 ## 测试
 
 ```powershell
